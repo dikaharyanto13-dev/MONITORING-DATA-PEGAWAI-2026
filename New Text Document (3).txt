@@ -1,0 +1,371 @@
+import React, { useState, useMemo } from 'react';
+import { 
+  Users, Search, Moon, Sun, LayoutDashboard, ChevronLeft, 
+  Menu, AlertTriangle, Clock, CheckCircle2, 
+  Edit3, Plus, ShieldCheck, User, LogOut, TrendingUp,
+  FileText, Calendar, Filter, X
+} from 'lucide-react';
+
+/**
+ * LOGIKA BISNIS URGENSI PENSIUN
+ */
+const calculateUrgency = (pns) => {
+  if (!pns.TMT) return { urgency: "menunggu", urgencyLabel: "Menunggu" };
+  const tmtPensiun = new Date(pns.TMT);
+  const today = new Date();
+  const diffTime = tmtPensiun - today;
+  const diffMonths = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 30.44));
+
+  if (diffMonths <= 0) return { urgency: "expired", urgencyLabel: "Lewat TMT" };
+  if (diffMonths <= 3) return { urgency: "sangat-segera", urgencyLabel: "Sangat Segera" };
+  if (diffMonths <= 6) return { urgency: "segera", urgencyLabel: "Segera" };
+  return { urgency: "menunggu", urgencyLabel: "Menunggu" };
+};
+
+const App = () => {
+  // State Utama
+  const [role, setRole] = useState('user'); 
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [darkMode, setDarkMode] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedPns, setSelectedPns] = useState(null);
+  
+  // Data Pegawai (Unique Keys Fixed)
+  const [dataPegawai, setDataPegawai] = useState(() => {
+    const baseData = [
+      { id: "p-21", Nama: "HAYATUDDIN HAMISI, S.Pd", NIP: "196601121994121003", Pangkat: "IV/c", Jabatan: "Guru Ahli Madya", TMT: "2026-02-01", Unit: "SMP NEGERI 1 KOTA TERNATE", Operator: "IBU IRA", Status: "Pending" },
+      { id: "p-22", Nama: "JONI GANI, S.Pd", NIP: "196801141991031013", Pangkat: "III/c", Jabatan: "KASUBAG TATA USAHA", TMT: "2026-02-01", Unit: "SMP NEGERI 5 KOTA TERNATE", Operator: "IBU IRA", Status: "Done" },
+      { id: "p-23", Nama: "Dra. SUGIARTINI, MM", NIP: "196601091995112001", Pangkat: "IV/c", Jabatan: "Guru Ahli Madya", TMT: "2026-02-01", Unit: "SMP NEGERI 5 KOTA TERNATE", Operator: "IBU IRA", Status: "Pending" },
+      { id: "p-24", Nama: "IBRAHIM ABDULLAH MARSAOLY, S.Pd", NIP: "196601252000081001", Pangkat: "IV/a", Jabatan: "Guru Ahli Muda", TMT: "2026-02-01", Unit: "SMP NEGERI 7 KOTA TERNATE", Operator: "PAK DIKA", Status: "Pending" },
+      { id: "p-25", Nama: "SYARIF SAMSUDIN, S.Pd", NIP: "196601212000081001", Pangkat: "IV/a", Jabatan: "Guru Ahli Madya", TMT: "2026-03-01", Unit: "SMP NEGERI 1 KOTA TERNATE", Operator: "PAK DIKA", Status: "Done" },
+      { id: "p-1", Nama: "Dra. NURHAYATI S. RAZAK", NIP: "196602051994032007", Pangkat: "IV/c", Jabatan: "Kepala Sekolah", TMT: "2026-03-01", Unit: "SD NEGERI 1 KOTA TERNATE", Operator: "IBU NAMI", Status: "Pending" },
+      { id: "p-2", Nama: "Dra. HJ. RUKIA SY. ABDULLAH", NIP: "196602101991032005", Pangkat: "IV/c", Jabatan: "Guru Ahli Madya", TMT: "2026-04-01", Unit: "SMP NEGERI 1 KOTA TERNATE", Operator: "IBU NAMI", Status: "Pending" },
+      { id: "p-157", Nama: "Dra. HJ. MARIAM", NIP: "196605151992032001", Pangkat: "IV/c", Jabatan: "PENYULUH MADYA", TMT: "2026-06-01", Unit: "DPPKB KOTA TERNATE", Operator: "PAK RAIS", Status: "Pending" },
+    ];
+
+    const additionalData = Array.from({ length: 149 }).map((_, i) => ({
+      id: `sim-data-${i}`,
+      Nama: `PEGAWAI SIMULASI KE-${i + 1}`,
+      NIP: `19660${Math.floor(Math.random()*9)}152000081${200 + i}`,
+      Pangkat: i % 2 === 0 ? "IV/b" : "III/d",
+      Jabatan: i % 3 === 0 ? "Guru Ahli Madya" : "Penyusun Laporan",
+      TMT: `2026-0${(i % 9) + 1}-01`,
+      Unit: i % 2 === 0 ? "DINAS KESEHATAN" : "DINAS PENDIDIKAN",
+      Operator: ["IBU IRA", "IBU NAMI", "PAK DIKA", "PAK RAIS"][i % 4],
+      Status: i % 5 === 0 ? "Done" : "Pending"
+    }));
+
+    return [...baseData, ...additionalData];
+  });
+
+  const processedData = useMemo(() => {
+    return dataPegawai.map(item => ({
+      ...item,
+      ...calculateUrgency(item)
+    })).sort((a, b) => new Date(a.TMT) - new Date(b.TMT));
+  }, [dataPegawai]);
+
+  const filteredData = processedData.filter(item => 
+    item.Nama.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    item.NIP.includes(searchTerm)
+  );
+
+  // CRUD Handler
+  const handleUpdateStatus = (id) => {
+    if (role !== 'admin') return;
+    setDataPegawai(prev => prev.map(p => p.id === id ? { ...p, Status: p.Status === 'Done' ? 'Pending' : 'Done' } : p));
+  };
+
+  const handleEdit = (pns) => {
+    if (role !== 'admin') return;
+    setSelectedPns(pns);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEdit = (e) => {
+    e.preventDefault();
+    setDataPegawai(prev => prev.map(p => p.id === selectedPns.id ? selectedPns : p));
+    setIsEditModalOpen(false);
+  };
+
+  return (
+    <div className={`min-h-screen flex ${darkMode ? 'bg-[#0b1120] text-slate-200' : 'bg-[#f1f5f9] text-slate-900'} transition-all duration-300 font-sans selection:bg-indigo-500 selection:text-white`}>
+      
+      {/* SIDEBAR (Bisa disembunyikan sepenuhnya) */}
+      <aside className={`fixed top-0 left-0 h-screen z-50 transition-all duration-500 ease-in-out border-r shadow-2xl overflow-hidden
+        ${isSidebarOpen ? 'w-72 opacity-100 translate-x-0' : 'w-0 opacity-0 -translate-x-full'} 
+        ${darkMode ? 'bg-[#111827] border-slate-800' : 'bg-white border-slate-200'}`}>
+        
+        <div className="p-8 border-b dark:border-slate-800 flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-violet-700 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-indigo-500/20">S</div>
+            <div>
+              <h1 className="text-lg font-black bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600">SIPEKA</h1>
+              <p className="text-[8px] uppercase tracking-tighter text-slate-400 font-bold italic">Smart Pensiun Ternate</p>
+            </div>
+          </div>
+          <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-2 text-slate-400">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="px-6 py-6">
+          <div className={`p-4 rounded-2xl flex items-center gap-3 ${role === 'admin' ? 'bg-indigo-50 dark:bg-indigo-500/10' : 'bg-slate-50 dark:bg-slate-800'}`}>
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${role === 'admin' ? 'bg-indigo-600 text-white' : 'bg-slate-400 text-white'}`}>
+              {role === 'admin' ? <ShieldCheck size={20} /> : <User size={20} />}
+            </div>
+            <div className="overflow-hidden">
+              <p className="text-[10px] font-black uppercase text-slate-400 truncate">Mode Akses</p>
+              <select 
+                value={role} 
+                onChange={(e) => setRole(e.target.value)}
+                className="bg-transparent font-black text-sm outline-none cursor-pointer text-indigo-600 uppercase w-full"
+              >
+                <option value="admin">ADMIN</option>
+                <option value="user">USER</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <nav className="p-6 space-y-2">
+          <SidebarItem active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<LayoutDashboard size={20} />} label="Beranda" />
+          <SidebarItem active={activeTab === 'monitoring'} onClick={() => setActiveTab('monitoring')} icon={<Users size={20} />} label="Data Pegawai" />
+        </nav>
+
+        <div className="absolute bottom-8 left-0 w-full px-6">
+           <button className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-rose-500 font-bold hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-all">
+             <LogOut size={20} /> <span>Keluar</span>
+           </button>
+        </div>
+      </aside>
+
+      {/* MAIN CONTENT (Ukuran menyesuaikan sidebar) */}
+      <main className={`flex-1 min-h-screen p-6 md:p-10 transition-all duration-500 ease-in-out ${isSidebarOpen ? 'ml-72' : 'ml-0'}`}>
+        
+        {/* HEADER BAR */}
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
+          <div className="flex items-center gap-6">
+            {/* Tombol Panggil Menu */}
+            <button 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+              className={`p-3.5 rounded-2xl border transition-all active:scale-90 ${darkMode ? 'bg-slate-800 border-slate-700 text-indigo-400' : 'bg-white border-slate-200 text-indigo-600 shadow-xl shadow-indigo-500/10'}`}
+              title={isSidebarOpen ? "Tutup Menu" : "Buka Menu"}
+            >
+              {isSidebarOpen ? <ChevronLeft size={24} /> : <Menu size={24} />}
+            </button>
+            <div>
+              <h2 className="text-3xl md:text-4xl font-black tracking-tighter">{activeTab === 'dashboard' ? 'Dashboard SIPEKA' : 'Data Terpusat'}</h2>
+              <p className="text-slate-400 text-sm font-medium">Sistem Informasi Pengolahan Berkas Pensiun</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 self-end md:self-auto">
+            <button onClick={() => setDarkMode(!darkMode)} className="p-4 rounded-2xl border bg-white dark:bg-slate-800 shadow-xl border-slate-200 dark:border-slate-700">
+              {darkMode ? <Sun size={20} className="text-yellow-400" /> : <Moon size={20} className="text-slate-600" />}
+            </button>
+          </div>
+        </header>
+
+        {activeTab === 'dashboard' && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {/* STATS HERO */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+              <StatHero label="Total Target 2026" val={processedData.length} sub="Pegawai Pensiun" icon={<Users className="text-indigo-600" />} bg="bg-indigo-500" />
+              <StatHero label="Segera Diurus" val={processedData.filter(d => d.urgency !== 'menunggu' && d.Status !== 'Done').length} sub="Deadline Dekat" icon={<Clock className="text-amber-600" />} bg="bg-amber-500" />
+              <StatHero label="Selesai Berkas" val={processedData.filter(d => d.Status === 'Done').length} sub="Telah Diusulkan" icon={<CheckCircle2 className="text-emerald-600" />} bg="bg-emerald-500" />
+              <StatHero label="Sisa Antrean" val={processedData.filter(d => d.Status !== 'Done').length} sub="Menunggu Proses" icon={<FileText className="text-rose-600" />} bg="bg-rose-500" />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
+              {/* TREND CHART */}
+              <div className={`lg:col-span-2 p-8 rounded-[2.5rem] border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200 shadow-2xl shadow-indigo-500/5'}`}>
+                <div className="flex justify-between items-center mb-8">
+                  <h3 className="text-xl font-black">Tren Pensiun Bulanan</h3>
+                  <span className="text-[10px] font-bold px-3 py-1 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 rounded-lg">DATA 2026</span>
+                </div>
+                <div className="flex items-end justify-between h-48 gap-3 px-2">
+                  {[24, 38, 52, 28, 45, 12].map((h, i) => (
+                    <div key={`chart-bar-${i}`} className="flex-1 flex flex-col items-center gap-3">
+                      <div className="w-full bg-slate-100 dark:bg-slate-900 rounded-xl relative overflow-hidden h-40">
+                         <div 
+                          style={{ height: `${h}%` }} 
+                          className="absolute bottom-0 w-full bg-gradient-to-t from-indigo-600 to-indigo-400 animate-in slide-in-from-bottom duration-1000"
+                        />
+                      </div>
+                      <span className="text-[9px] font-black text-slate-400 uppercase">{['Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul'][i]}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* OPERATOR INFO */}
+              <div className={`p-8 rounded-[2.5rem] border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200 shadow-2xl shadow-indigo-500/5'}`}>
+                <h3 className="text-xl font-black mb-6">Beban Operator</h3>
+                <div className="space-y-5">
+                  {['IBU IRA', 'IBU NAMI', 'PAK DIKA', 'PAK RAIS'].map(op => {
+                    const count = processedData.filter(d => d.Operator === op).length;
+                    const done = processedData.filter(d => d.Operator === op && d.Status === 'Done').length;
+                    const pct = Math.round((done / count) * 100);
+                    return (
+                      <div key={`op-${op}`} className="space-y-2">
+                        <div className="flex justify-between items-end">
+                          <span className="text-xs font-black">{op}</span>
+                          <span className="text-[10px] font-bold text-slate-400">{pct}%</span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-100 dark:bg-slate-900 rounded-full overflow-hidden">
+                          <div style={{ width: `${pct}%` }} className="h-full bg-indigo-500 rounded-full" />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-8 p-6 bg-indigo-600 rounded-3xl text-white relative overflow-hidden group">
+                  <TrendingUp className="absolute -right-4 -bottom-4 w-24 h-24 opacity-10" />
+                  <p className="text-xs font-bold opacity-80 uppercase">Target Tercapai</p>
+                  <p className="text-2xl font-black">94.2%</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'monitoring' && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className={`p-6 md:p-10 rounded-[2.5rem] border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200 shadow-2xl shadow-indigo-500/5'}`}>
+               <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-10 gap-6">
+                <div>
+                  <h3 className="text-2xl md:text-3xl font-black">Database Pensiun</h3>
+                  <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mt-2">Sinkronisasi Terakhir: 6 Maret 2026</p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-4 w-full xl:w-auto">
+                  <div className="relative group flex-1">
+                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input 
+                      type="text" 
+                      placeholder="Cari..."
+                      className="pl-12 pr-6 py-4 rounded-2xl border w-full xl:w-80 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 font-medium"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  {role === 'admin' && (
+                    <button className="flex items-center justify-center gap-2 px-6 py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg shadow-indigo-600/25">
+                      <Plus size={18} /> <span>Tambah</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="overflow-x-auto rounded-3xl border dark:border-slate-700">
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-slate-50 dark:bg-slate-900/50 text-[10px] font-black uppercase text-slate-400">
+                    <tr>
+                      <th className="py-6 px-6">Pegawai</th>
+                      <th className="py-6 px-6">Unit Kerja</th>
+                      <th className="py-6 px-6">TMT</th>
+                      <th className="py-6 px-6 text-center">Status</th>
+                      <th className="py-6 px-6 text-center">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y dark:divide-slate-700">
+                    {filteredData.map((pns) => {
+                      const isDone = pns.Status === 'Done';
+                      return (
+                        <tr key={pns.id} className={`group hover:bg-indigo-50/30 dark:hover:bg-indigo-500/5 transition-all ${isDone ? 'opacity-60' : ''}`}>
+                          <td className="py-6 px-6">
+                            <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center font-black text-slate-500">{pns.Nama.charAt(0)}</div>
+                              <div>
+                                <p className="font-black text-sm text-slate-800 dark:text-slate-100">{pns.Nama}</p>
+                                <p className="text-[10px] text-slate-400 font-mono">{pns.NIP}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-6 px-6">
+                            <p className="text-[10px] font-bold text-slate-500 uppercase">{pns.Unit}</p>
+                            <span className="text-[9px] text-indigo-500 font-black">OP: {pns.Operator}</span>
+                          </td>
+                          <td className="py-6 px-6 text-sm font-bold">{pns.TMT}</td>
+                          <td className="py-6 px-6 text-center">
+                             <UrgencyBadge type={isDone ? 'done' : pns.urgency} label={isDone ? 'Selesai' : pns.urgencyLabel} />
+                          </td>
+                          <td className="py-6 px-6">
+                            <div className="flex justify-center gap-2">
+                              {role === 'admin' ? (
+                                <>
+                                  <button onClick={() => handleEdit(pns)} className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-indigo-600 hover:text-white"><Edit3 size={16} /></button>
+                                  <button onClick={() => handleUpdateStatus(pns.id)} className={`p-2.5 rounded-xl ${isDone ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'}`}><CheckCircle2 size={16} /></button>
+                                </>
+                              ) : (
+                                <div className="text-[10px] font-black uppercase text-indigo-500">Terdaftar</div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* MODAL EDIT */}
+      {isEditModalOpen && selectedPns && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
+          <div className={`w-full max-w-lg rounded-[2.5rem] p-10 shadow-2xl ${darkMode ? 'bg-slate-800' : 'bg-white'}`}>
+            <div className="flex justify-between items-center mb-8">
+              <h3 className="text-2xl font-black">Edit Data</h3>
+              <button onClick={() => setIsEditModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full"><X /></button>
+            </div>
+            <form onSubmit={handleSaveEdit} className="space-y-5">
+              <input type="text" value={selectedPns.Nama} onChange={(e) => setSelectedPns({...selectedPns, Nama: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-bold" placeholder="Nama" />
+              <input type="date" value={selectedPns.TMT} onChange={(e) => setSelectedPns({...selectedPns, TMT: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-bold" />
+              <div className="flex gap-4">
+                <button type="button" onClick={() => setIsEditModalOpen(false)} className="flex-1 py-4 font-black text-slate-400">BATAL</button>
+                <button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black">SIMPAN</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const SidebarItem = ({ active, onClick, icon, label }) => (
+  <button onClick={onClick} className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all ${active ? 'bg-indigo-600 text-white shadow-lg font-black' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 font-bold'}`}>
+    {icon} <span className="text-sm">{label}</span>
+  </button>
+);
+
+const StatHero = ({ label, val, sub, icon, bg }) => (
+  <div className="bg-white dark:bg-slate-800 p-8 rounded-[2rem] border dark:border-slate-700 shadow-xl shadow-indigo-500/5 group relative overflow-hidden transition-all hover:scale-[1.02]">
+    <div className={`absolute top-0 right-0 w-20 h-20 ${bg} opacity-[0.05] rounded-bl-full`} />
+    <div className="flex flex-col gap-4">
+      <div className="w-12 h-12 rounded-xl bg-slate-50 dark:bg-slate-900 flex items-center justify-center">{icon}</div>
+      <div>
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
+        <p className="text-3xl font-black mt-1">{val}</p>
+        <p className="text-[9px] font-bold text-slate-400 mt-1">{sub}</p>
+      </div>
+    </div>
+  </div>
+);
+
+const UrgencyBadge = ({ type, label }) => {
+  const styles = {
+    'sangat-segera': 'bg-rose-500/10 text-rose-600 border-rose-200',
+    'segera': 'bg-amber-500/10 text-amber-600 border-amber-200',
+    'menunggu': 'bg-indigo-500/10 text-indigo-600 border-indigo-200',
+    'done': 'bg-emerald-500/10 text-emerald-600 border-emerald-200',
+    'expired': 'bg-slate-500/10 text-slate-400 border-slate-200'
+  };
+  return <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase border ${styles[type]}`}>{label}</span>;
+};
+
+export default App;
