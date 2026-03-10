@@ -97,7 +97,7 @@ const parseCSV = (text) => {
 
 const loadCSVData = async () => {
   try {
-    const response = await fetch('./data pensiun 2026.csv');
+    const response = await fetch('./datapensiun2026.csv');
     const text = await response.text();
     return parseCSV(text);
   } catch (e) {
