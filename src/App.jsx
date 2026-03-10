@@ -53,7 +53,7 @@ const parseCSV = (text) => {
 
 const loadCSVData = async () => {
   try {
-    const response = await fetch('./data_pensiun 2026.csv');
+    const response = await fetch('./data_pensiun_2026.csv');
     const text = await response.text();
     return parseCSV(text);
   } catch (e) {
